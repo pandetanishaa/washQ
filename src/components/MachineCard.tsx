@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import StatusBadge, { MachineStatus } from "./StatusBadge";
 import { WashingMachine, Users, Clock } from "lucide-react";
-import { QRScanner } from "@/components/QRScanner"; // Correct named import
 import { useState } from "react";
 
 export interface Machine {
@@ -20,7 +19,6 @@ interface MachineCardProps {
 
 const MachineCard = ({ machine, index }: MachineCardProps) => {
   const navigate = useNavigate();
-  const [isScanning, setIsScanning] = useState(false);
 
   const getStatusInfo = () => {
     switch (machine.status) {
@@ -35,22 +33,13 @@ const MachineCard = ({ machine, index }: MachineCardProps) => {
     }
   };
 
-  const handleQRScan = (scannedId: string) => {
-    if (scannedId === machine.id) {
-      navigate(`/machine/${scannedId}`); // Redirect to machine page
-    } else {
-      alert("Invalid QR code. Please scan the correct machine QR.");
-    }
-    setIsScanning(false);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
       className="pixel-card p-4 cursor-pointer hover:scale-[1.02] transition-transform"
-      onClick={() => setIsScanning(true)} // Trigger QR scanner
+      onClick={() => navigate(`/machine/${machine.id}`)} // Redirect to machine page on click
     >
       <div className="flex items-center gap-4">
         {/* Machine Icon */}
@@ -93,9 +82,6 @@ const MachineCard = ({ machine, index }: MachineCardProps) => {
       <div className="mt-3 pt-3 border-t border-border">
         <p className="text-sm text-muted-foreground font-pixel">{getStatusInfo()}</p>
       </div>
-
-      {/* QR Scanner Modal */}
-      {isScanning && <QRScanner onScanSuccess={handleQRScan} onClose={() => setIsScanning(false)} />}
     </motion.div>
   );
 };

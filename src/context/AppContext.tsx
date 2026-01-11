@@ -19,6 +19,7 @@ import {
   where,
   writeBatch,
   Timestamp,
+  getDoc,
 } from "firebase/firestore";
 
 /**
@@ -91,6 +92,7 @@ interface AppContextType {
   startWash: (machineId: string) => Promise<void>;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  fetchMachineDetails: (machineId: string) => Promise<Machine | null>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -430,6 +432,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Update fetchMachineDetails to return a Machine object
+  const fetchMachineDetails = async (machineId: string): Promise<Machine> => {
+    const machineRef = doc(db, "machines", machineId);
+    const machineSnap = await getDoc(machineRef);
+    if (machineSnap.exists()) {
+      const data = machineSnap.data();
+      return {
+        id: machineId,
+        name: data.name,
+        status: data.status,
+        queueCount: data.queueCount,
+        timeRemaining: data.timeRemaining,
+      };
+    } else {
+      throw new Error("Machine not found");
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -449,6 +469,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         startWash,
         isLoading,
         setIsLoading,
+        fetchMachineDetails,
       }}
     >
       {children}

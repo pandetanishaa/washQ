@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useApp } from "@/context/AppContext";
 import { ArrowLeft, Clock, Users, Play, Calendar, QrCode, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect } from "react";
 
 /**
  * MachineStatus Page
@@ -29,7 +30,14 @@ import { toast } from "sonner";
 const MachineStatus = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { machines, user, bookMachine, startWash, isLoading } = useApp();
+  const { machines, user, bookMachine, startWash, isLoading, fetchMachineDetails } = useApp();
+
+  // Ensure machine details load correctly
+  useEffect(() => {
+    if (id) {
+      fetchMachineDetails(id);
+    }
+  }, [id, fetchMachineDetails]);
 
   // Validate machineId exists in route params
   if (!id) {
@@ -194,6 +202,27 @@ const MachineStatus = () => {
       <Layout>
         <div className="flex items-center justify-center min-h-screen">
           <PixelLoader size="lg" text="Starting wash..." />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Add logic to restrict booking to QR route
+  if (!id) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-screen px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md text-center"
+          >
+            <AlertCircle className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-pixel text-foreground mb-3">No Machine Selected</h2>
+            <p className="text-muted-foreground font-pixel mb-6">
+              Please scan the QR on the washing machine to book.
+            </p>
+          </motion.div>
         </div>
       </Layout>
     );
