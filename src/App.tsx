@@ -11,6 +11,7 @@ import Machines from "./pages/Machines";
 import MachineStatus from "./pages/MachineStatus";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import PreLoginHome from "./pages/PreLoginHome";
 
 const queryClient = new QueryClient();
 
@@ -31,9 +32,13 @@ const AppRoutes = () => {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
-            <Index />
-          </ProtectedRoute>
+          isAuthenticated ? (
+            <ProtectedRoute>
+              <Index />
+            </ProtectedRoute>
+          ) : (
+            <PreLoginHome />
+          )
         }
       />
       <Route
