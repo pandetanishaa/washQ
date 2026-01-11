@@ -252,11 +252,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       let userRole: "user" | "admin" = credentials.role;
 
       if (isNewUser) {
-        // For new users, create the document with selected role
+        // For new users, create the document with role: "user"
         await addDoc(collection(db, "users"), {
           uid: userCredential.user.uid,
           email: credentials.email,
-          role: credentials.role,
+          role: "user", // Default role
           createdAt: Timestamp.now(),
         });
       } else {
@@ -325,15 +325,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Helper function to remove undefined fields from an object
+  const sanitizeObject = (obj: Record<string, any>) => {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([_, value]) => value !== undefined)
+    );
+  };
+
   const addMachine = async (machine: Omit<Machine, "id">) => {
     try {
-      const docRef = await addDoc(collection(db, "machines"), {
+      const machineData = sanitizeObject({
         name: machine.name,
         status: machine.status,
-        timeRemaining: machine.timeRemaining,
+        timeRemaining: machine.timeRemaining ?? 0, // Default to 0 if undefined
         queueCount: machine.queueCount,
         createdAt: Timestamp.now(),
       });
+
+      const docRef = await addDoc(collection(db, "machines"), machineData);
 
       // Update local state
       setMachines((prev) => [...prev, { ...machine, id: docRef.id }]);

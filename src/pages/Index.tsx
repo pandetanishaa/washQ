@@ -1,12 +1,47 @@
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import PixelButton from "@/components/PixelButton";
 import { QRScanner } from "@/components/QRScanner";
 import { ScanLine, List, Sparkles } from "lucide-react";
+import { useApp } from "@/context/AppContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/firebase";
 
 const Index = () => {
+  const { user } = useApp();
+  const [activeBooking, setActiveBooking] = useState(null);
+  const [machineDetails, setMachineDetails] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchBookingDetails = async () => {
+      if (user?.activeBooking) {
+        try {
+          // Fetch booking details
+          const bookingRef = doc(db, "bookings", user.activeBooking);
+          const bookingSnap = await getDoc(bookingRef);
+
+          if (bookingSnap.exists()) {
+            const bookingData = bookingSnap.data();
+
+            // Fetch machine details
+            const machineRef = doc(db, "machines", bookingData.machineId);
+            const machineSnap = await getDoc(machineRef);
+
+            if (machineSnap.exists()) {
+              setMachineDetails(machineSnap.data());
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching booking details:", error);
+        }
+      }
+    };
+
+    fetchBookingDetails();
+  }, [user]);
 
   return (
     <Layout>
@@ -99,6 +134,22 @@ const Index = () => {
             className="absolute -bottom-2 -left-4 w-6 h-6 rounded-full bg-bubble-2 opacity-60"
           />
         </motion.div>
+
+        {/* Active Booking Section */}
+        <div className="mt-8 w-full max-w-md">
+          {user?.activeBooking && machineDetails ? (
+            <div className="pixel-card p-4">
+              <h2 className="text-xl font-pixel text-primary mb-2">Active Booking</h2>
+              <p className="text-lg font-pixel text-foreground">Machine: {machineDetails.name}</p>
+              <p className="text-sm text-muted-foreground">Status: {machineDetails.status.toUpperCase()}</p>
+              {machineDetails.timeRemaining !== undefined && (
+                <p className="text-sm text-muted-foreground">Time Remaining: {machineDetails.timeRemaining} mins</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground font-pixel">You have no active bookings</p>
+          )}
+        </div>
 
         {/* CTA Buttons */}
         <motion.div

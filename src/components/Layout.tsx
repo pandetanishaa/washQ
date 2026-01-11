@@ -25,28 +25,24 @@ const Layout = ({ children, showNav = true }: LayoutProps) => {
     ...(userRole === "admin" ? [{ path: "/admin", icon: Settings, label: "Admin" }] : []),
   ];
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
 
   return (
-    <div className="min-h-screen pixel-bg relative">
+    <div className="pixel-bg relative min-h-screen">
       <FloatingBubbles />
       
       {/* Top Right Controls */}
       {showNav && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
           <HelpFeedbackDialog />
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white border-2 border-red-700 rounded-lg font-pixel text-sm hover:bg-red-600 transition-colors"
+            className="font-pixel flex items-center gap-2 rounded-lg border-2 border-red-700 bg-red-500 px-3 py-2 text-sm text-white transition-colors hover:bg-red-600"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="h-4 w-4" />
             <span>LOGOUT</span>
           </button>
         </div>
@@ -59,22 +55,22 @@ const Layout = ({ children, showNav = true }: LayoutProps) => {
 
       {/* Bottom Navigation */}
       {showNav && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t-4 border-primary/20 px-4 py-2 safe-area-inset-bottom">
-          <div className="flex justify-around items-center max-w-md mx-auto">
+        <nav className="bg-card border-primary/20 safe-area-inset-bottom fixed bottom-0 left-0 right-0 z-50 border-t-4 px-4 py-2">
+          <div className="mx-auto flex max-w-md items-center justify-around">
             {navItems.map(({ path, icon: Icon, label }) => {
               const isActive = location.pathname === path;
               return (
                 <Link
                   key={path}
                   to={path}
-                  className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all ${
+                  className={`flex flex-col items-center gap-1 rounded-lg px-4 py-2 transition-all ${
                     isActive 
                       ? "text-primary bg-primary/10" 
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon className="w-6 h-6" />
-                  <span className="text-xs font-pixel">{label}</span>
+                  <Icon className="h-6 w-6" />
+                  <span className="font-pixel text-xs">{label}</span>
                 </Link>
               );
             })}

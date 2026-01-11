@@ -35,12 +35,16 @@ import {
 import { toast } from "sonner";
 
 const Admin = () => {
-  const { machines, addMachine, removeMachine, updateMachineStatus, feedback } = useApp();
+  const { user, machines, addMachine, removeMachine, updateMachineStatus, feedback } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<string | null>(null);
   const [expandedQR, setExpandedQR] = useState<string | null>(null);
   const [newMachineName, setNewMachineName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<MachineStatus>("available");
+
+  if (!user || user.role !== "admin") {
+    return null; // Hide admin UI for non-admin users
+  }
 
   const handleAddMachine = async () => {
     if (!newMachineName.trim()) {
@@ -52,6 +56,7 @@ const Admin = () => {
       await addMachine({
         name: newMachineName,
         status: "available",
+        timeRemaining: 0, // Explicitly set timeRemaining to 0
       });
 
       setNewMachineName("");
