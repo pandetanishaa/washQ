@@ -95,7 +95,7 @@ const MachineCard = ({ machine, index }: MachineCardProps) => {
       </div>
 
       {/* QR Scanner Modal */}
-      {isScanning && <QRScanner onScan={handleQRScan} onClose={() => setIsScanning(false)} />}
+      {isScanning && <QRScanner onScanSuccess={handleQRScan} onClose={() => setIsScanning(false)} />}
     </motion.div>
   );
 };

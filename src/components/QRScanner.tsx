@@ -32,11 +32,13 @@ const scanQRFromCanvas = (canvas: HTMLCanvasElement): string | null => {
   }
 };
 
+// Add onClose prop to QRScannerProps
 interface QRScannerProps {
   onScanSuccess?: (machineId: string) => void;
+  onClose?: () => void;
 }
 
-export const QRScanner = ({ onScanSuccess }: QRScannerProps) => {
+export const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
   const navigate = useNavigate();
   const { machines } = useApp();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -197,6 +199,7 @@ export const QRScanner = ({ onScanSuccess }: QRScannerProps) => {
   const handleClose = () => {
     stopCamera();
     setIsOpen(false);
+    if (onClose) onClose();
   };
 
   // Cleanup on unmount
@@ -207,7 +210,10 @@ export const QRScanner = ({ onScanSuccess }: QRScannerProps) => {
   }, []);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (open) startCamera();
+    }}>
       <DialogTrigger asChild>
         <PixelButton
           variant="secondary"

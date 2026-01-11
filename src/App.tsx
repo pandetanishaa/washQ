@@ -29,18 +29,7 @@ const AppRoutes = () => {
       />
 
       {/* Protected Routes */}
-      <Route
-        path="/"
-        element={
-          isAuthenticated ? (
-            <ProtectedRoute>
-              <Index />
-            </ProtectedRoute>
-          ) : (
-            <PreLoginHome />
-          )
-        }
-      />
+      <Route path="/" element={<Index />} />
       <Route
         path="/machines"
         element={
@@ -78,7 +67,7 @@ const App = () => (
       <AppProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename="/washq">
           <AppRoutes />
         </BrowserRouter>
       </AppProvider>
