@@ -67,9 +67,9 @@ const MachineStatus = () => {
             className="max-w-md text-center"
           >
             <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-pixel text-foreground mb-3">Machine Not Found</h2>
+            <h2 className="text-2xl font-pixel text-foreground mb-3">Invalid Machine QR</h2>
             <p className="text-muted-foreground font-pixel mb-6">
-              The machine you're looking for doesn't exist. Try scanning a valid QR code.
+              The QR code you scanned is invalid or expired. Please try scanning again or select a machine from the list.
             </p>
             <PixelButton onClick={() => navigate("/machines")}>
               Back to Machines
