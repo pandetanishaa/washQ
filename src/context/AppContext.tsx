@@ -1,6 +1,56 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { Machine } from "@/components/MachineCard";
 import { MachineStatus } from "@/components/StatusBadge";
+import { auth, db } from "@/firebase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  writeBatch,
+  Timestamp,
+} from "firebase/firestore";
+
+/**
+ * WASHQ APPLICATION CONTEXT WITH FIREBASE INTEGRATION
+ * 
+ * KEY FEATURES & RESTRICTIONS:
+ * 
+ * 1. AUTHENTICATION
+ *    - Uses Firebase Auth with email/password
+ *    - Two roles: "user" and "admin" (stored in custom claims or user doc)
+ *    - Automatically restored on app mount via onAuthStateChanged
+ *    - Offline-capable: Auth state persists across sessions
+ * 
+ * 2. BOOKING SYSTEM
+ *    - Users can only book machines with valid machineId context
+ *    - machineId must come from QR scan or machine list selection
+ *    - Only ONE active booking per user at a time
+ *    - Active bookings stored in Firestore "bookings" collection
+ *    - Offline: Local changes sync when reconnected
+ * 
+ * 3. FEEDBACK SYSTEM
+ *    - Users must be logged in to submit feedback
+ *    - Feedback stored in Firestore "feedback" collection
+ *    - Admin can view all feedback with user email, timestamp, and message
+ *    - Offline: Local submissions sync when reconnected
+ * 
+ * 4. DATA PERSISTENCE
+ *    - Machines, bookings, feedback synced with Firestore
+ *    - Offline persistence enabled: IndexedDB caches all data
+ *    - Automatic sync when app comes online
+ *    - Real-time listeners for machines (if enabled)
+ */
 
 interface User {
   id: string;
@@ -11,7 +61,17 @@ interface User {
 
 interface AuthCredentials {
   email: string;
+  password: string;
   role: "user" | "admin";
+}
+
+export interface Feedback {
+  id: string;
+  userId: string;
+  userEmail: string;
+  subject: "issue" | "suggestion" | "other";
+  message: string;
+  createdAt: string;
 }
 
 interface AppContextType {
@@ -19,148 +79,412 @@ interface AppContextType {
   userRole: "user" | "admin" | null;
   isAuthenticated: boolean;
   setUser: (user: User | null) => void;
-  login: (credentials: AuthCredentials) => void;
-  logout: () => void;
+  login: (credentials: AuthCredentials) => Promise<void>;
+  logout: () => Promise<void>;
   machines: Machine[];
   setMachines: React.Dispatch<React.SetStateAction<Machine[]>>;
-  updateMachineStatus: (id: string, status: MachineStatus) => void;
-  addMachine: (machine: Omit<Machine, "id">) => void;
-  removeMachine: (id: string) => void;
-  bookMachine: (machineId: string) => boolean;
-  clearActiveBooking: () => void;
-  startWash: (machineId: string) => void;
+  updateMachineStatus: (id: string, status: MachineStatus) => Promise<void>;
+  addMachine: (machine: Omit<Machine, "id">) => Promise<void>;
+  removeMachine: (id: string) => Promise<void>;
+  bookMachine: (machineId: string) => Promise<boolean>;
+  clearActiveBooking: () => Promise<void>;
+  startWash: (machineId: string) => Promise<void>;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+  feedback: Feedback[];
+  submitFeedback: (subject: "issue" | "suggestion" | "other", message: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const initialMachines: Machine[] = [
-  { id: "m1", name: "Washer #1", status: "available" },
-  { id: "m2", name: "Washer #2", status: "running", timeRemaining: 15 },
-  { id: "m3", name: "Washer #3", status: "waiting", queueCount: 2 },
-  { id: "m4", name: "Washer #4", status: "available" },
-  { id: "m5", name: "Washer #5", status: "out-of-order" },
-  { id: "m6", name: "Washer #6", status: "running", timeRemaining: 28 },
-];
-
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [machines, setMachines] = useState<Machine[]>(initialMachines);
-  const [isLoading, setIsLoading] = useState(false);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
 
-  // Load user from localStorage on mount
+  // Initialize auth listener and load initial data
   useEffect(() => {
-    const savedUser = localStorage.getItem("washq_user");
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        // Restore active booking from localStorage
-        const savedBooking = localStorage.getItem("washq_activeBooking");
-        if (savedBooking) {
-          parsedUser.activeBooking = savedBooking;
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in - fetch their role and active booking
+        try {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const usersSnapshot = await getDocs(
+            query(collection(db, "users"), where("uid", "==", firebaseUser.uid))
+          );
+          
+          let role: "user" | "admin" = "user";
+          if (!usersSnapshot.empty) {
+            const userData = usersSnapshot.docs[0].data();
+            role = userData.role || "user";
+          }
+
+          // Fetch active booking
+          const bookingsSnapshot = await getDocs(
+            query(
+              collection(db, "bookings"),
+              where("userId", "==", firebaseUser.uid)
+            )
+          );
+
+          let activeBooking: string | undefined;
+          if (!bookingsSnapshot.empty) {
+            activeBooking = bookingsSnapshot.docs[0].data().machineId;
+          }
+
+          const appUser: User = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            role,
+            activeBooking,
+          };
+          setUser(appUser);
+        } catch (error) {
+          console.error("Error loading user data:", error);
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            role: "user",
+          });
         }
-        setUser(parsedUser);
-      } catch (err) {
-        console.error("Failed to load user from localStorage", err);
-        localStorage.removeItem("washq_user");
-        localStorage.removeItem("washq_activeBooking");
+      } else {
+        // User is signed out
+        setUser(null);
       }
-    }
+
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load machines from Firestore
+  useEffect(() => {
+    const loadMachines = async () => {
+      try {
+        const machinesSnapshot = await getDocs(collection(db, "machines"));
+        const machinesList: Machine[] = machinesSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          name: doc.data().name,
+          status: doc.data().status as MachineStatus,
+          timeRemaining: doc.data().timeRemaining,
+          queueCount: doc.data().queueCount,
+        }));
+        setMachines(machinesList);
+      } catch (error) {
+        console.error("Error loading machines:", error);
+        // Fallback to empty array - offline data will be served from cache
+        setMachines([]);
+      }
+    };
+
+    loadMachines();
+  }, []);
+
+  // Load feedback from Firestore
+  useEffect(() => {
+    const loadFeedback = async () => {
+      try {
+        const feedbackSnapshot = await getDocs(collection(db, "feedback"));
+        const feedbackList: Feedback[] = feedbackSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          userId: doc.data().userId,
+          userEmail: doc.data().userEmail,
+          subject: doc.data().subject,
+          message: doc.data().message,
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+        }));
+        setFeedback(feedbackList);
+      } catch (error) {
+        console.error("Error loading feedback:", error);
+      }
+    };
+
+    loadFeedback();
   }, []);
 
   // Compute auth state
   const isAuthenticated = user !== null;
   const userRole = user?.role || null;
 
-  // Login function
-  const login = (credentials: AuthCredentials) => {
-    const newUser: User = {
-      id: `user_${Date.now()}`,
-      email: credentials.email,
-      role: credentials.role,
-    };
-    setUser(newUser);
-    localStorage.setItem("washq_user", JSON.stringify(newUser));
+  // Firebase login function
+  const login = async (credentials: AuthCredentials) => {
+    try {
+      let userCredential;
+      let isNewUser = false;
+
+      // Try to sign in first
+      try {
+        userCredential = await signInWithEmailAndPassword(
+          auth,
+          credentials.email,
+          credentials.password
+        );
+      } catch (error: any) {
+        // If user doesn't exist, create account
+        // Handle both "user-not-found" (existing Firebase) and "invalid-credential" (no users)
+        if (
+          error.code === "auth/user-not-found" ||
+          error.code === "auth/invalid-credential"
+        ) {
+          console.log(
+            "User not found or invalid credentials. Creating new account..."
+          );
+          userCredential = await createUserWithEmailAndPassword(
+            auth,
+            credentials.email,
+            credentials.password
+          );
+          isNewUser = true;
+        } else {
+          // Re-throw other errors (wrong password, invalid email, etc.)
+          console.error("Authentication error:", error.code, error.message);
+          throw error;
+        }
+      }
+
+      // Create/update user document in Firestore
+      const usersSnapshot = await getDocs(
+        query(collection(db, "users"), where("uid", "==", userCredential.user.uid))
+      );
+
+      let userRole: "user" | "admin" = credentials.role;
+
+      if (isNewUser) {
+        // For new users, create the document with selected role
+        await addDoc(collection(db, "users"), {
+          uid: userCredential.user.uid,
+          email: credentials.email,
+          role: credentials.role,
+          createdAt: Timestamp.now(),
+        });
+      } else {
+        // For existing users, use their stored role from Firestore
+        if (!usersSnapshot.empty) {
+          const userData = usersSnapshot.docs[0].data();
+          userRole = userData.role || "user";
+        }
+        // Update last login timestamp
+        if (!usersSnapshot.empty) {
+          const userDocId = usersSnapshot.docs[0].id;
+          await updateDoc(doc(db, "users", userDocId), {
+            lastLogin: Timestamp.now(),
+          });
+        }
+      }
+
+      const appUser: User = {
+        id: userCredential.user.uid,
+        email: credentials.email,
+        role: userRole,
+      };
+      setUser(appUser);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      throw error;
+    }
   };
 
-  // Logout function
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("washq_user");
+  // Firebase logout function
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error;
+    }
   };
 
-  const updateMachineStatus = (id: string, status: MachineStatus) => {
-    setMachines((prev) =>
-      prev.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              status,
-              queueCount: status === "waiting" ? m.queueCount : undefined,
-              timeRemaining: status === "running" ? 30 : undefined,
-            }
-          : m
-      )
-    );
+  const updateMachineStatus = async (id: string, status: MachineStatus) => {
+    try {
+      const machineDocRef = doc(db, "machines", id);
+      await updateDoc(machineDocRef, {
+        status,
+        timeRemaining: status === "running" ? 30 : undefined,
+        queueCount: status === "waiting" ? 1 : undefined,
+      });
+
+      // Update local state
+      setMachines((prev) =>
+        prev.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                status,
+                timeRemaining: status === "running" ? 30 : undefined,
+                queueCount: status === "waiting" ? 1 : undefined,
+              }
+            : m
+        )
+      );
+    } catch (error) {
+      console.error("Error updating machine status:", error);
+      throw error;
+    }
   };
 
-  const addMachine = (machine: Omit<Machine, "id">) => {
-    const newId = `m${Date.now()}`;
-    setMachines((prev) => [...prev, { ...machine, id: newId }]);
+  const addMachine = async (machine: Omit<Machine, "id">) => {
+    try {
+      const docRef = await addDoc(collection(db, "machines"), {
+        name: machine.name,
+        status: machine.status,
+        timeRemaining: machine.timeRemaining,
+        queueCount: machine.queueCount,
+        createdAt: Timestamp.now(),
+      });
+
+      // Update local state
+      setMachines((prev) => [...prev, { ...machine, id: docRef.id }]);
+    } catch (error) {
+      console.error("Error adding machine:", error);
+      throw error;
+    }
   };
 
-  const removeMachine = (id: string) => {
-    setMachines((prev) => prev.filter((m) => m.id !== id));
+  const removeMachine = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "machines", id));
+      setMachines((prev) => prev.filter((m) => m.id !== id));
+    } catch (error) {
+      console.error("Error removing machine:", error);
+      throw error;
+    }
   };
 
-  const bookMachine = (machineId: string): boolean => {
+  const bookMachine = async (machineId: string): Promise<boolean> => {
+    // Check local state first
     if (user?.activeBooking) {
+      console.warn("User already has an active booking:", user.activeBooking);
       return false; // User already has an active booking
     }
 
     const machine = machines.find((m) => m.id === machineId);
-    if (!machine) return false;
-
-    if (machine.status === "available") {
-      updateMachineStatus(machineId, "waiting");
-      setMachines((prev) =>
-        prev.map((m) =>
-          m.id === machineId ? { ...m, queueCount: 1 } : m
-        )
-      );
-    } else if (machine.status === "waiting" || machine.status === "running") {
-      setMachines((prev) =>
-        prev.map((m) =>
-          m.id === machineId
-            ? { ...m, queueCount: (m.queueCount || 0) + 1 }
-            : m
-        )
-      );
+    if (!machine) {
+      console.warn("Machine not found:", machineId);
+      return false;
     }
 
-    setUser((prev) => (prev ? { ...prev, activeBooking: machineId } : null));
-    // Persist active booking to localStorage
-    localStorage.setItem("washq_activeBooking", machineId);
-    return true;
-  };
-
-  const clearActiveBooking = () => {
-    setUser((prev) => (prev ? { ...prev, activeBooking: undefined } : null));
-    localStorage.removeItem("washq_activeBooking");
-  };
-
-  const startWash = (machineId: string) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      updateMachineStatus(machineId, "running");
-      setMachines((prev) =>
-        prev.map((m) =>
-          m.id === machineId ? { ...m, timeRemaining: 30 } : m
+    try {
+      // Double-check in Firestore to prevent race conditions
+      const existingBookings = await getDocs(
+        query(
+          collection(db, "bookings"),
+          where("userId", "==", user?.id)
         )
       );
+
+      if (!existingBookings.empty) {
+        console.warn("User already has active booking in Firestore");
+        return false; // User already has an active booking in Firestore
+      }
+
+      // Create booking in Firestore
+      const bookingRef = await addDoc(collection(db, "bookings"), {
+        userId: user?.id,
+        userEmail: user?.email,
+        machineId,
+        startTime: Timestamp.now(),
+        createdAt: Timestamp.now(),
+      });
+
+      // Update local state
+      setUser((prev) =>
+        prev
+          ? { ...prev, activeBooking: machineId }
+          : null
+      );
+
+      // Update machine status to waiting
+      const newStatus: MachineStatus = "waiting";
+      await updateMachineStatus(machineId, newStatus);
+
+      return true;
+    } catch (error) {
+      console.error("Error booking machine:", error);
+      return false;
+    }
+  };
+
+  const clearActiveBooking = async () => {
+    try {
+      if (!user?.activeBooking) return;
+
+      // Delete booking from Firestore
+      const bookingsSnapshot = await getDocs(
+        query(
+          collection(db, "bookings"),
+          where("userId", "==", user.id),
+          where("machineId", "==", user.activeBooking)
+        )
+      );
+
+      const batch = writeBatch(db);
+      bookingsSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+
+      // Update local state
+      setUser((prev) =>
+        prev ? { ...prev, activeBooking: undefined } : null
+      );
+    } catch (error) {
+      console.error("Error clearing active booking:", error);
+      throw error;
+    }
+  };
+
+  const startWash = async (machineId: string) => {
+    setIsLoading(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await updateMachineStatus(machineId, "running");
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
+  };
+
+  const submitFeedback = async (
+    subject: "issue" | "suggestion" | "other",
+    message: string
+  ): Promise<boolean> => {
+    if (!user) {
+      console.error("User not authenticated");
+      return false;
+    }
+
+    if (!message.trim()) {
+      console.error("Message is empty");
+      return false;
+    }
+
+    try {
+      const feedbackRef = await addDoc(collection(db, "feedback"), {
+        userId: user.id,
+        userEmail: user.email,
+        subject,
+        message,
+        createdAt: Timestamp.now(),
+      });
+
+      // Update local state
+      const newFeedback: Feedback = {
+        id: feedbackRef.id,
+        userId: user.id,
+        userEmail: user.email,
+        subject,
+        message,
+        createdAt: new Date().toISOString(),
+      };
+      setFeedback((prev) => [...prev, newFeedback]);
+
+      return true;
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      return false;
+    }
   };
 
   return (
@@ -182,6 +506,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         startWash,
         isLoading,
         setIsLoading,
+        feedback,
+        submitFeedback,
       }}
     >
       {children}

@@ -3,6 +3,8 @@ import FloatingBubbles from "./FloatingBubbles";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, WashingMachine, Settings, LogOut } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { useMachineNotifications } from "@/hooks/useMachineNotifications";
+import { HelpFeedbackDialog } from "./HelpFeedbackDialog";
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,30 +16,40 @@ const Layout = ({ children, showNav = true }: LayoutProps) => {
   const navigate = useNavigate();
   const { logout, userRole } = useApp();
 
+  // Monitor machine status changes and notify user
+  useMachineNotifications();
+
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/machines", icon: WashingMachine, label: "Machines" },
     ...(userRole === "admin" ? [{ path: "/admin", icon: Settings, label: "Admin" }] : []),
   ];
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (
     <div className="min-h-screen pixel-bg relative">
       <FloatingBubbles />
       
-      {/* Logout Button - Top Right */}
+      {/* Top Right Controls */}
       {showNav && (
-        <button
-          onClick={handleLogout}
-          className="fixed top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-red-500 text-white border-2 border-red-700 rounded-lg font-pixel text-sm hover:bg-red-600 transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>LOGOUT</span>
-        </button>
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          <HelpFeedbackDialog />
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white border-2 border-red-700 rounded-lg font-pixel text-sm hover:bg-red-600 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>LOGOUT</span>
+          </button>
+        </div>
       )}
       
       {/* Main Content */}

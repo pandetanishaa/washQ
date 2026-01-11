@@ -10,6 +10,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useApp();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState<"user" | "admin">("user");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -23,22 +24,43 @@ const Login = () => {
       return;
     }
 
+    if (!password || password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
     setIsLoading(true);
 
-    // Mock authentication delay
-    setTimeout(() => {
-      try {
-        login({
-          email,
-          role: selectedRole,
-        });
-        setIsLoading(false);
-        navigate(selectedRole === "admin" ? "/admin" : "/machines");
-      } catch (err) {
-        setError("Login failed. Please try again.");
-        setIsLoading(false);
+    try {
+      await login({
+        email,
+        password,
+        role: selectedRole,
+      });
+      navigate(selectedRole === "admin" ? "/admin" : "/machines");
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/invalid-credential"
+      ) {
+        setError("Creating new account...");
+      } else if (err.code === "auth/wrong-password") {
+        setError("Incorrect password. Please try again.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("Invalid email address.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Password is too weak. Use at least 6 characters.");
+      } else if (err.code === "auth/email-already-in-use") {
+        setError("Email already registered. Please sign in with your password.");
+      } else if (err.code === "auth/operation-not-allowed") {
+        setError("Email/password authentication is not enabled.");
+      } else {
+        setError(err.message || "Authentication failed. Please try again.");
       }
-    }, 500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,9 +114,22 @@ const Login = () => {
               />
             </div>
 
+            {/* Password Input */}
+            <div className="space-y-2">
+              <label className="text-sm font-pixel text-primary">PASSWORD</label>
+              <Input
+                type="password"
+                placeholder="Enter password (min 6 chars)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="border-2 border-primary focus:border-primary focus:ring-0"
+              />
+            </div>
+
             {/* Role Selection */}
             <div className="space-y-3">
-              <label className="text-sm font-pixel text-primary">ROLE</label>
+              <label className="text-sm font-pixel text-primary">ROLE (for new users)</label>
               <div className="flex gap-4">
                 <button
                   type="button"
@@ -126,7 +161,7 @@ const Login = () => {
             {/* Login Button */}
             <PixelButton
               onClick={handleLogin}
-              disabled={isLoading || !email}
+              disabled={isLoading || !email || !password}
               className="w-full"
             >
               {isLoading ? "LOGGING IN..." : "LOGIN"}
@@ -135,10 +170,11 @@ const Login = () => {
 
           {/* Demo Credentials */}
           <div className="mt-6 pt-6 border-t-2 border-gray-200">
-            <p className="text-xs font-pixel text-gray-500 mb-2">DEMO EMAILS:</p>
+            <p className="text-xs font-pixel text-gray-500 mb-2">SIGN UP / SIGN IN:</p>
             <div className="text-xs text-gray-600 space-y-1">
-              <p>• User: user@example.com</p>
-              <p>• Admin: admin@example.com</p>
+              <p>• New user? Enter any email & create password</p>
+              <p>• Existing user? Enter your registered email & password</p>
+              <p>• Example: user@example.com / password123</p>
             </div>
           </div>
         </motion.div>
@@ -150,7 +186,7 @@ const Login = () => {
           transition={{ delay: 0.3 }}
           className="text-center mt-8 text-xs text-gray-500 font-pixel"
         >
-          Mock authentication • localStorage-based
+          Firebase Authentication • Firestore with offline persistence
         </motion.div>
       </motion.div>
     </div>

@@ -4,6 +4,7 @@ import Layout from "@/components/Layout";
 import PixelButton from "@/components/PixelButton";
 import StatusBadge, { MachineStatus } from "@/components/StatusBadge";
 import QRPlaceholder from "@/components/QRPlaceholder";
+import { MachineQRCode } from "@/components/MachineQRCode";
 import { useApp } from "@/context/AppContext";
 import {
   Dialog,
@@ -28,41 +29,59 @@ import {
   Trash2,
   WashingMachine,
   QrCode,
+  MessageSquare,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
 const Admin = () => {
-  const { machines, addMachine, removeMachine, updateMachineStatus } = useApp();
+  const { machines, addMachine, removeMachine, updateMachineStatus, feedback } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<string | null>(null);
+  const [expandedQR, setExpandedQR] = useState<string | null>(null);
   const [newMachineName, setNewMachineName] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<MachineStatus>("available");
 
-  const handleAddMachine = () => {
+  const handleAddMachine = async () => {
     if (!newMachineName.trim()) {
       toast.error("Please enter a machine name");
       return;
     }
 
-    addMachine({
-      name: newMachineName,
-      status: "available",
-    });
+    try {
+      await addMachine({
+        name: newMachineName,
+        status: "available",
+      });
 
-    setNewMachineName("");
-    setIsAddDialogOpen(false);
-    toast.success("Machine added successfully!");
+      setNewMachineName("");
+      setIsAddDialogOpen(false);
+      toast.success("Machine added successfully!");
+    } catch (error) {
+      console.error("Error adding machine:", error);
+      toast.error("Failed to add machine");
+    }
   };
 
-  const handleUpdateStatus = (machineId: string, status: MachineStatus) => {
-    updateMachineStatus(machineId, status);
-    setEditingMachine(null);
-    toast.success("Machine status updated!");
+  const handleUpdateStatus = async (machineId: string, status: MachineStatus) => {
+    try {
+      await updateMachineStatus(machineId, status);
+      setEditingMachine(null);
+      toast.success("Machine status updated!");
+    } catch (error) {
+      console.error("Error updating machine status:", error);
+      toast.error("Failed to update status");
+    }
   };
 
-  const handleRemoveMachine = (machineId: string) => {
-    removeMachine(machineId);
-    toast.success("Machine removed");
+  const handleRemoveMachine = async (machineId: string) => {
+    try {
+      await removeMachine(machineId);
+      toast.success("Machine removed");
+    } catch (error) {
+      console.error("Error removing machine:", error);
+      toast.error("Failed to remove machine");
+    }
   };
 
   return (
@@ -220,35 +239,66 @@ const Admin = () => {
                   </div>
                 </motion.div>
               ) : (
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                  {/* QR Preview */}
-                  <div className="flex items-center gap-2">
-                    <QrCode className="w-5 h-5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground font-pixel">
-                      QR Code Available
-                    </span>
+                <div>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                    {/* QR Toggle */}
+                    <PixelButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedQR(
+                          expandedQR === machine.id ? null : machine.id
+                        )
+                      }
+                      className="flex items-center gap-2"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span className="text-xs font-pixel">
+                        {expandedQR === machine.id ? "Hide QR" : "Show QR"}
+                      </span>
+                      <ChevronDown
+                        className={`w-3 h-3 transition-transform ${
+                          expandedQR === machine.id ? "rotate-180" : ""
+                        }`}
+                      />
+                    </PixelButton>
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <PixelButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingMachine(machine.id);
+                          setSelectedStatus(machine.status);
+                        }}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </PixelButton>
+                      <PixelButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveMachine(machine.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-danger" />
+                      </PixelButton>
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <PixelButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingMachine(machine.id);
-                        setSelectedStatus(machine.status);
-                      }}
+                  {/* QR Code Expanded View */}
+                  {expandedQR === machine.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4 pt-4 border-t border-border flex justify-center"
                     >
-                      <Edit2 className="w-4 h-4" />
-                    </PixelButton>
-                    <PixelButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveMachine(machine.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-danger" />
-                    </PixelButton>
-                  </div>
+                      <MachineQRCode
+                        machineId={machine.id}
+                        machineName={machine.name}
+                      />
+                    </motion.div>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -271,6 +321,66 @@ const Admin = () => {
           <div className="flex justify-center">
             <QRPlaceholder size="lg" />
           </div>
+        </motion.div>
+
+        {/* Feedback Section */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-8"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-pixel text-foreground">Feedback</h2>
+            <span className="text-sm font-pixel bg-primary text-white px-2 py-1 rounded">
+              {feedback.length}
+            </span>
+          </div>
+
+          {feedback.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="pixel-card p-6 text-center"
+            >
+              <p className="text-muted-foreground font-pixel">
+                No feedback yet
+              </p>
+            </motion.div>
+          ) : (
+            <div className="grid gap-4">
+              {feedback.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="pixel-card p-4"
+                >
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-pixel text-foreground">
+                        {item.userEmail}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-pixel">
+                        {new Date(item.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-pixel rounded uppercase">
+                      {item.subject}
+                    </span>
+                  </div>
+
+                  {/* Message */}
+                  <p className="text-sm text-foreground mt-3 p-3 bg-muted rounded border border-border">
+                    {item.message}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </motion.div>
       </div>
     </Layout>

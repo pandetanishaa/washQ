@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import PixelButton from "@/components/PixelButton";
+import { QRScanner } from "@/components/QRScanner";
 import { ScanLine, List, Sparkles } from "lucide-react";
 
 const Index = () => {
@@ -106,15 +107,7 @@ const Index = () => {
           transition={{ delay: 0.6 }}
           className="flex flex-col gap-4 w-full max-w-xs"
         >
-          <PixelButton
-            variant="primary"
-            size="lg"
-            className="w-full flex items-center justify-center gap-3 bounce-gentle pulse-glow"
-            onClick={() => navigate("/machines")}
-          >
-            <ScanLine className="w-5 h-5" />
-            Scan QR & Book Slot
-          </PixelButton>
+          <QRScanner />
 
           <PixelButton
             variant="outline"

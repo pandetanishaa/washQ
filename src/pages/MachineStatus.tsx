@@ -82,7 +82,7 @@ const MachineStatus = () => {
 
   const isUserInQueue = user?.activeBooking === machine.id;
 
-  const handleBookSlot = () => {
+  const handleBookSlot = async () => {
     // Validate machineId context before booking
     if (!id || !machine) {
       toast.error("Scan QR or select a machine first", {
@@ -91,23 +91,37 @@ const MachineStatus = () => {
       return;
     }
 
-    const success = bookMachine(machine.id);
-    if (success) {
-      toast.success("Slot booked successfully!", {
-        description: "You'll be notified when it's your turn.",
-      });
-    } else {
-      toast.error("You already have an active booking", {
-        description: "Complete your current wash first.",
+    try {
+      const success = await bookMachine(machine.id);
+      if (success) {
+        toast.success("Slot booked successfully!", {
+          description: "You'll be notified when it's your turn.",
+        });
+      } else {
+        toast.error("You already have an active booking", {
+          description: "Complete your current wash first.",
+        });
+      }
+    } catch (error) {
+      console.error("Error booking machine:", error);
+      toast.error("Failed to book machine", {
+        description: "Please try again.",
       });
     }
   };
 
-  const handleStartWash = () => {
-    startWash(machine.id);
-    toast.success("Wash started!", {
-      description: "Your laundry is now being cleaned.",
-    });
+  const handleStartWash = async () => {
+    try {
+      await startWash(machine.id);
+      toast.success("Wash started!", {
+        description: "Your laundry is now being cleaned.",
+      });
+    } catch (error) {
+      console.error("Error starting wash:", error);
+      toast.error("Failed to start wash", {
+        description: "Please try again.",
+      });
+    }
   };
 
   const getActionButton = () => {
@@ -120,15 +134,18 @@ const MachineStatus = () => {
     }
 
     if (machine.status === "available" && !isUserInQueue) {
+      // Disable booking if user has active booking on different machine
+      const hasOtherBooking = user?.activeBooking && user.activeBooking !== machine.id;
       return (
         <PixelButton
           variant="primary"
           size="lg"
           className="w-full flex items-center justify-center gap-2 pulse-glow"
           onClick={handleBookSlot}
+          disabled={hasOtherBooking}
         >
           <Calendar className="w-5 h-5" />
-          Book Slot
+          {hasOtherBooking ? "Complete Current Booking First" : "Book Slot"}
         </PixelButton>
       );
     }
@@ -156,16 +173,18 @@ const MachineStatus = () => {
       );
     }
 
+    // Join queue button - disabled if user has active booking elsewhere
+    const hasActiveBooking = user?.activeBooking && user.activeBooking !== machine.id;
     return (
       <PixelButton
         variant="outline"
         size="lg"
         className="w-full"
         onClick={handleBookSlot}
-        disabled={!!user?.activeBooking}
+        disabled={hasActiveBooking}
       >
         <Users className="w-5 h-5 mr-2" />
-        Join Queue
+        {hasActiveBooking ? "Complete Current Booking First" : "Join Queue"}
       </PixelButton>
     );
   };
