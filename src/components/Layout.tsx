@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import FloatingBubbles from "./FloatingBubbles";
-import { Link, useLocation } from "react-router-dom";
-import { Home, WashingMachine, Settings } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, WashingMachine, Settings, LogOut } from "lucide-react";
+import { useApp } from "@/context/AppContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,16 +11,34 @@ interface LayoutProps {
 
 const Layout = ({ children, showNav = true }: LayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, userRole } = useApp();
 
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/machines", icon: WashingMachine, label: "Machines" },
-    { path: "/admin", icon: Settings, label: "Admin" },
+    ...(userRole === "admin" ? [{ path: "/admin", icon: Settings, label: "Admin" }] : []),
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <div className="min-h-screen pixel-bg relative">
       <FloatingBubbles />
+      
+      {/* Logout Button - Top Right */}
+      {showNav && (
+        <button
+          onClick={handleLogout}
+          className="fixed top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-red-500 text-white border-2 border-red-700 rounded-lg font-pixel text-sm hover:bg-red-600 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>LOGOUT</span>
+        </button>
+      )}
       
       {/* Main Content */}
       <main className="relative z-10 pb-20">

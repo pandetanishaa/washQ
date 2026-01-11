@@ -2,10 +2,11 @@ import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import MachineCard from "@/components/MachineCard";
 import { useApp } from "@/context/AppContext";
-import { WashingMachine } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { WashingMachine, AlertCircle } from "lucide-react";
 
 const Machines = () => {
-  const { machines } = useApp();
+  const { machines, user } = useApp();
 
   const availableCount = machines.filter((m) => m.status === "available").length;
   const runningCount = machines.filter((m) => m.status === "running").length;
@@ -35,6 +36,22 @@ const Machines = () => {
             </span>
           </div>
         </motion.div>
+
+        {/* Active Booking Alert */}
+        {user?.activeBooking && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Alert className="border-2 border-yellow-500 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-700 font-pixel text-sm">
+                You already have an active booking. You cannot book another machine until you complete your current one.
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
 
         {/* Machine Grid */}
         <div className="grid gap-4">

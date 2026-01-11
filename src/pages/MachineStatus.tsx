@@ -6,14 +6,54 @@ import PixelLoader from "@/components/PixelLoader";
 import StatusBadge from "@/components/StatusBadge";
 import QRPlaceholder from "@/components/QRPlaceholder";
 import PixelMascot from "@/components/PixelMascot";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useApp } from "@/context/AppContext";
-import { ArrowLeft, Clock, Users, Play, Calendar, QrCode } from "lucide-react";
+import { ArrowLeft, Clock, Users, Play, Calendar, QrCode, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+/**
+ * MachineStatus Page
+ * 
+ * QR Validation Flow:
+ * 1. User scans QR code → routes to /machine/:id
+ * 2. machineId is extracted from route params
+ * 3. If machineId missing → show "No Machine Selected" error
+ * 4. If machine doesn't exist in machines list → show "Machine Not Found" error
+ * 5. If both valid → display machine details and allow booking
+ * 
+ * Booking Restrictions:
+ * - User can only book if they have valid machineId context (from QR or URL)
+ * - If machineId becomes invalid → show "Scan QR or select a machine first"
+ * - Booking also respects single active booking constraint
+ */
 const MachineStatus = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { machines, user, bookMachine, startWash, isLoading } = useApp();
+
+  // Validate machineId exists in route params
+  if (!id) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center min-h-screen px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md text-center"
+          >
+            <AlertCircle className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-pixel text-foreground mb-3">No Machine Selected</h2>
+            <p className="text-muted-foreground font-pixel mb-6">
+              Scan a QR code or select a machine to proceed
+            </p>
+            <PixelButton onClick={() => navigate("/machines")}>
+              View All Machines
+            </PixelButton>
+          </motion.div>
+        </div>
+      </Layout>
+    );
+  }
 
   const machine = machines.find((m) => m.id === id);
 
@@ -21,12 +61,20 @@ const MachineStatus = () => {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-screen px-4">
-          <p className="text-xl font-pixel text-muted-foreground mb-4">
-            Machine not found
-          </p>
-          <PixelButton variant="outline" onClick={() => navigate("/machines")}>
-            Back to Machines
-          </PixelButton>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md text-center"
+          >
+            <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-pixel text-foreground mb-3">Machine Not Found</h2>
+            <p className="text-muted-foreground font-pixel mb-6">
+              The machine you're looking for doesn't exist. Try scanning a valid QR code.
+            </p>
+            <PixelButton onClick={() => navigate("/machines")}>
+              Back to Machines
+            </PixelButton>
+          </motion.div>
         </div>
       </Layout>
     );
@@ -35,6 +83,14 @@ const MachineStatus = () => {
   const isUserInQueue = user?.activeBooking === machine.id;
 
   const handleBookSlot = () => {
+    // Validate machineId context before booking
+    if (!id || !machine) {
+      toast.error("Scan QR or select a machine first", {
+        description: "A valid machine ID is required to book.",
+      });
+      return;
+    }
+
     const success = bookMachine(machine.id);
     if (success) {
       toast.success("Slot booked successfully!", {
@@ -239,6 +295,23 @@ const MachineStatus = () => {
             </div>
           )}
         </motion.div>
+
+        {/* Active Booking Alert */}
+        {user?.activeBooking && user.activeBooking !== machine.id && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="mb-6"
+          >
+            <Alert className="border-2 border-yellow-500 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-700 font-pixel text-sm">
+                You already have an active booking on another machine. Complete it first!
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
 
         {/* Action Button */}
         <motion.div
