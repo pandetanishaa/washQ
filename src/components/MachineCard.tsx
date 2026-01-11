@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import StatusBadge, { MachineStatus } from "./StatusBadge";
 import { WashingMachine, Users, Clock } from "lucide-react";
-import QRScanner from "@/components/QRScanner"; // Import QRScanner component
+import { QRScanner } from "@/components/QRScanner"; // Correct named import
 import { useState } from "react";
 
 export interface Machine {

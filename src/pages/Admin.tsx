@@ -35,7 +35,7 @@ import {
 import { toast } from "sonner";
 
 const Admin = () => {
-  const { user, machines, addMachine, removeMachine, updateMachineStatus, feedback } = useApp();
+  const { user, machines, addMachine, removeMachine, updateMachineStatus } = useApp();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<string | null>(null);
   const [expandedQR, setExpandedQR] = useState<string | null>(null);
@@ -326,66 +326,6 @@ const Admin = () => {
           <div className="flex justify-center">
             <QRPlaceholder size="lg" />
           </div>
-        </motion.div>
-
-        {/* Feedback Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-8"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <MessageSquare className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-pixel text-foreground">Feedback</h2>
-            <span className="text-sm font-pixel bg-primary text-white px-2 py-1 rounded">
-              {feedback.length}
-            </span>
-          </div>
-
-          {feedback.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="pixel-card p-6 text-center"
-            >
-              <p className="text-muted-foreground font-pixel">
-                No feedback yet
-              </p>
-            </motion.div>
-          ) : (
-            <div className="grid gap-4">
-              {feedback.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="pixel-card p-4"
-                >
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-pixel text-foreground">
-                        {item.userEmail}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-pixel">
-                        {new Date(item.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs font-pixel rounded uppercase">
-                      {item.subject}
-                    </span>
-                  </div>
-
-                  {/* Message */}
-                  <p className="text-sm text-foreground mt-3 p-3 bg-muted rounded border border-border">
-                    {item.message}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          )}
         </motion.div>
       </div>
     </Layout>

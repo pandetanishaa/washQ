@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import PixelButton from "@/components/PixelButton";
-import { QRScanner } from "@/components/QRScanner";
+import { QRScanner } from "@/components/QRScanner"; // Correct named import
 import { ScanLine, List, Sparkles } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { doc, getDoc } from "firebase/firestore";

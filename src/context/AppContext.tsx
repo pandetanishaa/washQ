@@ -91,8 +91,6 @@ interface AppContextType {
   startWash: (machineId: string) => Promise<void>;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
-  feedback: Feedback[];
-  submitFeedback: (subject: "issue" | "suggestion" | "other", message: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -101,7 +99,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [feedback, setFeedback] = useState<Feedback[]>([]);
 
   // Initialize auth listener and load initial data
   useEffect(() => {
@@ -180,28 +177,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadMachines();
-  }, []);
-
-  // Load feedback from Firestore
-  useEffect(() => {
-    const loadFeedback = async () => {
-      try {
-        const feedbackSnapshot = await getDocs(collection(db, "feedback"));
-        const feedbackList: Feedback[] = feedbackSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          userId: doc.data().userId,
-          userEmail: doc.data().userEmail,
-          subject: doc.data().subject,
-          message: doc.data().message,
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-        }));
-        setFeedback(feedbackList);
-      } catch (error) {
-        console.error("Error loading feedback:", error);
-      }
-    };
-
-    loadFeedback();
   }, []);
 
   // Compute auth state
@@ -455,47 +430,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const submitFeedback = async (
-    subject: "issue" | "suggestion" | "other",
-    message: string
-  ): Promise<boolean> => {
-    if (!user) {
-      console.error("User not authenticated");
-      return false;
-    }
-
-    if (!message.trim()) {
-      console.error("Message is empty");
-      return false;
-    }
-
-    try {
-      const feedbackRef = await addDoc(collection(db, "feedback"), {
-        userId: user.id,
-        userEmail: user.email,
-        subject,
-        message,
-        createdAt: Timestamp.now(),
-      });
-
-      // Update local state
-      const newFeedback: Feedback = {
-        id: feedbackRef.id,
-        userId: user.id,
-        userEmail: user.email,
-        subject,
-        message,
-        createdAt: new Date().toISOString(),
-      };
-      setFeedback((prev) => [...prev, newFeedback]);
-
-      return true;
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      return false;
-    }
-  };
-
   return (
     <AppContext.Provider
       value={{
@@ -515,8 +449,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         startWash,
         isLoading,
         setIsLoading,
-        feedback,
-        submitFeedback,
       }}
     >
       {children}
