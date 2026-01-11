@@ -5,6 +5,7 @@ import PixelButton from "@/components/PixelButton";
 import PixelLoader from "@/components/PixelLoader";
 import StatusBadge from "@/components/StatusBadge";
 import QRPlaceholder from "@/components/QRPlaceholder";
+import PixelMascot from "@/components/PixelMascot";
 import { useApp } from "@/context/AppContext";
 import { ArrowLeft, Clock, Users, Play, Calendar, QrCode } from "lucide-react";
 import { toast } from "sonner";
@@ -170,54 +171,25 @@ const MachineStatus = () => {
           </div>
         </motion.div>
 
-        {/* Machine Visual Placeholder */}
+        {/* Pixel Mascot */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="flex justify-center mb-8"
+          className="flex justify-center mb-12"
         >
-          <div className="w-48 h-56 pixel-card bg-card p-3">
-            <div className="h-full bg-muted rounded-lg relative overflow-hidden flex flex-col">
-              {/* Control panel */}
-              <div className="h-10 bg-card m-2 rounded flex items-center justify-between px-3">
-                <div className="flex gap-1">
-                  <div className={`w-3 h-3 rounded-full ${machine.status === "running" ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
-                  <div className={`w-3 h-3 rounded-full ${machine.status === "waiting" ? "bg-warning animate-pulse" : "bg-muted-foreground"}`} />
-                </div>
-                <span className="text-xs font-pixel text-muted-foreground">
-                  #{machine.id}
-                </span>
-              </div>
-              
-              {/* Drum area */}
-              <div className="flex-1 flex items-center justify-center">
-                <div className="w-28 h-28 rounded-full bg-primary/10 border-4 border-primary flex items-center justify-center">
-                  {machine.status === "running" ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-20 h-20"
-                    >
-                      <svg viewBox="0 0 40 40" className="w-full h-full">
-                        <circle cx="20" cy="6" r="5" fill="hsl(var(--secondary))" />
-                        <circle cx="34" cy="20" r="5" fill="hsl(var(--accent))" />
-                        <circle cx="20" cy="34" r="5" fill="hsl(var(--primary))" />
-                        <circle cx="6" cy="20" r="5" fill="hsl(var(--warning))" />
-                      </svg>
-                    </motion.div>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-4xl">👕</p>
-                      <p className="text-xs font-pixel text-muted-foreground mt-1">
-                        {machine.status === "available" ? "Ready!" : ""}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <PixelMascot
+            state={
+              machine.status === "available"
+                ? "idle"
+                : machine.status === "waiting"
+                ? "waiting"
+                : machine.status === "running"
+                ? "washing"
+                : "error"
+            }
+            size="lg"
+          />
         </motion.div>
 
         {/* Status Details */}
