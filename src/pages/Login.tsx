@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useApp } from "@/context/AppContext";
@@ -8,12 +8,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useApp();
+  const { login, isAuthenticated, userRole } = useApp();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState<"user" | "admin">("user");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect to appropriate dashboard after authentication
+  useEffect(() => {
+    if (isAuthenticated && userRole) {
+      navigate(userRole === "admin" ? "/admin" : "/machines", { replace: true });
+    }
+  }, [isAuthenticated, userRole, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +44,8 @@ const Login = () => {
         password,
         role: selectedRole,
       });
-      navigate(selectedRole === "admin" ? "/admin" : "/machines");
+      // Don't redirect here - let the auth state listener handle it
+      // The auth state will be updated, and App.tsx routing will redirect
     } catch (err: any) {
       console.error("Login error:", err);
       if (

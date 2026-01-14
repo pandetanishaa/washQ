@@ -18,6 +18,8 @@ export const ProtectedRoute = ({
   }
 
   if (requiredRole && userRole !== requiredRole) {
+    // If admin trying to access user route, redirect to admin
+    // If user trying to access admin route, redirect to machines
     return <Navigate to={userRole === "admin" ? "/admin" : "/machines"} replace />;
   }
 

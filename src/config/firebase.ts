@@ -28,7 +28,7 @@ export const db = getFirestore(app);
 
 // Enable offline persistence for Firestore
 // This allows the app to work offline and automatically sync when reconnected
-enableIndexedDbPersistence(db).catch((err) => {
+/*enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
     // Multiple tabs open
     console.warn('Multiple tabs open, offline persistence disabled');
@@ -36,7 +36,7 @@ enableIndexedDbPersistence(db).catch((err) => {
     // Browser doesn't support offline persistence
     console.warn('Browser does not support offline persistence');
   }
-});
+});*/
 
 /**
  * Firebase Firestore Collections Structure:

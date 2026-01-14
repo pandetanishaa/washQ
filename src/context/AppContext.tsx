@@ -188,8 +188,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // Firebase login function
   const login = async (credentials: AuthCredentials) => {
     try {
-      let userCredential;
       let isNewUser = false;
+      let userCredential;
 
       // Try to sign in first
       try {
@@ -221,28 +221,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Create/update user document in Firestore
-      const usersSnapshot = await getDocs(
-        query(collection(db, "users"), where("uid", "==", userCredential.user.uid))
-      );
-
-      let userRole: "user" | "admin" = credentials.role;
-
+      // For new users, create user document in Firestore with role "user"
       if (isNewUser) {
-        // For new users, create the document with role: "user"
         await addDoc(collection(db, "users"), {
           uid: userCredential.user.uid,
           email: credentials.email,
-          role: "user", // Default role
+          role: "user", // Default role - new users are always "user"
           createdAt: Timestamp.now(),
         });
-      } else {
-        // For existing users, use their stored role from Firestore
-        if (!usersSnapshot.empty) {
-          const userData = usersSnapshot.docs[0].data();
-          userRole = userData.role || "user";
-        }
-        // Update last login timestamp
+      }
+
+      // Update last login timestamp for existing users
+      if (!isNewUser) {
+        const usersSnapshot = await getDocs(
+          query(collection(db, "users"), where("uid", "==", userCredential.user.uid))
+        );
         if (!usersSnapshot.empty) {
           const userDocId = usersSnapshot.docs[0].id;
           await updateDoc(doc(db, "users", userDocId), {
@@ -251,11 +244,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
+      // Fetch user's actual role and active booking from Firestore
+      const usersSnapshot = await getDocs(
+        query(collection(db, "users"), where("uid", "==", userCredential.user.uid))
+      );
+
+      let fetchedRole: "user" | "admin" = "user";
+      if (!usersSnapshot.empty) {
+        const userData = usersSnapshot.docs[0].data();
+        fetchedRole = userData.role || "user";
+      }
+
+      // Fetch active booking
+      const bookingsSnapshot = await getDocs(
+        query(
+          collection(db, "bookings"),
+          where("userId", "==", userCredential.user.uid)
+        )
+      );
+
+      let activeBooking: string | undefined;
+      if (!bookingsSnapshot.empty) {
+        activeBooking = bookingsSnapshot.docs[0].data().machineId;
+      }
+
       const appUser: User = {
         id: userCredential.user.uid,
         email: credentials.email,
-        role: userRole,
+        role: fetchedRole,
+        activeBooking,
       };
+      
+      // Set user immediately so UI can respond without waiting for onAuthStateChanged
       setUser(appUser);
     } catch (error: any) {
       console.error("Login error:", error);
@@ -282,6 +302,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         timeRemaining: status === "running" ? 30 : undefined,
         queueCount: status === "waiting" ? 1 : undefined,
       });
+
+      // If machine is returning to "available", clear all bookings for this machine
+      if (status === "available") {
+        const bookingsSnapshot = await getDocs(
+          query(
+            collection(db, "bookings"),
+            where("machineId", "==", id)
+          )
+        );
+
+        const batch = writeBatch(db);
+        bookingsSnapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        // Update current user's activeBooking if they had a booking on this machine
+        if (user?.activeBooking === id) {
+          setUser((prev) =>
+            prev ? { ...prev, activeBooking: undefined } : null
+          );
+        }
+      }
 
       // Update local state
       setMachines((prev) =>
@@ -340,6 +383,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const bookMachine = async (machineId: string): Promise<boolean> => {
+    // Validate machineId is provided
+    if (!machineId || !machineId.trim()) {
+      console.warn("Invalid machineId provided to bookMachine");
+      return false;
+    }
+
     // Check local state first
     if (user?.activeBooking) {
       console.warn("User already has an active booking:", user.activeBooking);

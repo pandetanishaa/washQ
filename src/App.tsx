@@ -16,7 +16,7 @@ import PreLoginHome from "./pages/PreLoginHome";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, userRole } = useApp();
 
   return (
     <Routes>
@@ -24,7 +24,7 @@ const AppRoutes = () => {
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to="/machines" replace /> : <Login />
+          isAuthenticated ? <Navigate to={userRole === "admin" ? "/admin" : "/machines"} replace /> : <Login />
         }
       />
 
